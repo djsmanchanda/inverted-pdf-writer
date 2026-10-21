@@ -12,6 +12,8 @@ let desktop;
 try{
  desktop=await electron.launch({...(process.env.INVERTED_PDF_EXECUTABLE?{executablePath:path.resolve(process.env.INVERTED_PDF_EXECUTABLE)}:{}),args:[...(process.env.INVERTED_PDF_EXECUTABLE?[]:['.']),...(process.platform==='linux'?['--no-sandbox','--ozone-platform=headless']:[])],env,timeout:60000});
  const page=await desktop.firstWindow();
+ page.setDefaultTimeout(20000);
+ console.log('Opened isolated Electron test window.');
  await page.setViewportSize({width:1440,height:1000});
  await page.clock.install({time:new Date()});
  await page.reload();
@@ -21,6 +23,7 @@ try{
  assert.equal(await page.evaluate(()=>window.desktop.platform),process.platform);
  assert.equal(await page.evaluate(()=>typeof window.require),'undefined');
  assert.equal(await page.locator('#pdf-viewer').evaluate(f=>typeof f.contentWindow.desktop),'undefined');
+ console.log('Viewer loaded and isolated.');
  const pdfFrame=page.frameLocator('#pdf-viewer');
  await pdfFrame.locator('.page').first().waitFor();
  assert.equal(await pdfFrame.locator('html').evaluate(e=>e.classList.contains('inverted-page')),true);
@@ -48,6 +51,7 @@ try{
  assert.ok(index.documents[0].lastOpenedAt);
  const saved=await fs.readFile(path.join(dir,'library','documents',index.documents[0].id,'document.pdf'));
  assert.equal(saved.subarray(0,5).toString(),'%PDF-');
+ console.log('Pen stroke autosaved and library reopened.');
  const parsed=await PDFDocument.load(saved);
  const annots=parsed.getPage(0).node.Annots();
  assert.ok(annots?.size()>0,'A drawn stroke must be embedded in the saved PDF');
@@ -74,6 +78,7 @@ try{
  await page.getByLabel('Subject name',{exact:true}).fill('Biology');
  await page.getByRole('button',{name:'Create subject',exact:true}).click();
  await page.getByText('Subject added.',{exact:true}).waitFor();
+ console.log('Subject created and persisted.');
  const assigned=JSON.parse(await fs.readFile(path.join(dir,'library','library.json'),'utf8')).subjects.find(s=>s.name==='Biology');
  await page.getByLabel('Subject for Biology notes',{exact:true}).selectOption(assigned.id);
  await page.getByRole('button',{name:'Biology 1',exact:true}).click();
@@ -83,9 +88,15 @@ try{
  await page.getByRole('searchbox',{name:'Search PDFs',exact:true}).fill('Biology');
  await page.getByRole('button',{name:'Open Biology notes',exact:true}).click();
  await page.waitForFunction(()=>document.querySelector('#pdf-viewer').contentWindow.PDFViewerApplication?.pdfDocument&&document.querySelector('#save-status').textContent.startsWith('Saved locally'));
+ console.log('Import, subject assignment, and search passed.');
  // Simulate a failed library save: exporting the currently open PDF must still work.
  await desktop.evaluate(({ipcMain})=>{ipcMain.removeHandler('library:save');ipcMain.handle('library:save',()=>{throw Error('Simulated full library disk');});});
  await page.getByRole('button',{name:'Export PDF ↗',exact:true}).click();
  await page.getByText('PDF exported. Local autosave still needs attention.',{exact:true}).waitFor();
  console.log('Electron smoke passed: sandbox isolation, inversion, pen ink drawing, five-minute autosave, local PDF save, recovery copy, reopen with embedded ink, metadata, import, subjects, search, and PDF export even after a library save failure.');
-}finally{await desktop?.close();await fs.rm(dir,{recursive:true,force:true});}
+}finally{
+ // Failure tests intentionally leave the save handler broken. Exit this disposable
+ // instance directly so its normal unsaved-work dialog cannot block test cleanup.
+ if(desktop){await desktop.evaluate(({app})=>app.exit(0)).catch(()=>{});await desktop.close().catch(()=>{});}
+ await fs.rm(dir,{recursive:true,force:true});
+}
