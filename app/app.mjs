@@ -62,7 +62,7 @@ async function importFiles(){const button=$('#import-button');button.disabled=tr
 document.addEventListener('webviewerloaded',event=>{
  const source=event.detail.source;
  const options=source.PDFViewerApplicationOptions;
- options.set('disablePreferences',true);options.set('enableScripting',false);options.set('defaultUrl','');options.set('viewerCssTheme',2);options.set('defaultZoomValue','page-width');options.set('disableHistory',true);options.set('enableAltTextModelDownload',false);options.set('enableSignature',false);
+ options.set('disablePreferences',true);options.set('enableScripting',false);options.set('defaultUrl','');options.set('viewerCssTheme',2);options.set('defaultZoomValue','page-width');options.set('disableHistory',true);options.set('enableAltTextModelDownload',false);options.set('enableSignatureEditor',false);options.set('enableMerge',false);options.set('enableSplitMerge',false);
 });
 function saveStatus(text){$('#save-status').textContent=text;}
 function markChanged(){revision++;saveStatus('Unsaved notes · next autosave within 5 minutes');}

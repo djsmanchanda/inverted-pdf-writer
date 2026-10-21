@@ -42,7 +42,7 @@ try{
  await page.getByText('PDF and notes saved on this device.',{exact:true}).waitFor();
  await page.getByRole('button',{name:'← Library',exact:true}).click();
  await page.getByRole('button',{name:'Open Welcome to your study desk',exact:true}).waitFor();
- if(qaDir){await page.waitForFunction(()=>document.querySelector('.document-cover img'));await page.screenshot({path:path.join(qaDir,'library.png')});}
+ if(qaDir){await page.waitForFunction(()=>document.querySelector('.document-cover img'));await page.locator('#toast').evaluate(e=>e.hidden=true);await page.screenshot({path:path.join(qaDir,'library.png')});}
  const index=JSON.parse(await fs.readFile(path.join(dir,'library','library.json'),'utf8'));
  assert.equal(index.documents[0].pageCount,3);
  assert.ok(index.documents[0].lastOpenedAt);

@@ -12,8 +12,8 @@
     "preview": "node scripts/serve.mjs",
     "test": "node --test test/*.test.mjs",
     "test:electron": "node scripts/smoke-electron.mjs",
-    "dist:win": "electron-builder --win nsis --x64",
-    "dist:linux": "electron-builder --linux dir --x64",
+    "dist:win": "electron-builder --win nsis --x64 --publish never",
+    "dist:linux": "electron-builder --linux dir --x64 --publish never",
     "verify:vendor": "node scripts/verify-vendor.mjs",
     "postinstall": "node node_modules/electron/install.js"
   },
