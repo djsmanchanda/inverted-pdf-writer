@@ -10,7 +10,7 @@ const dir=await fs.mkdtemp(path.join(os.tmpdir(),'inverted-electron-'));
 const env={...process.env,INVERTED_PDF_DATA_DIR:dir};delete env.ELECTRON_RUN_AS_NODE;
 let desktop;
 try{
- desktop=await electron.launch({args:['.',...(process.platform==='linux'?['--no-sandbox','--ozone-platform=headless']:[])],env,timeout:60000});
+ desktop=await electron.launch({...(process.env.INVERTED_PDF_EXECUTABLE?{executablePath:path.resolve(process.env.INVERTED_PDF_EXECUTABLE)}:{}),args:[...(process.env.INVERTED_PDF_EXECUTABLE?[]:['.']),...(process.platform==='linux'?['--no-sandbox','--ozone-platform=headless']:[])],env,timeout:60000});
  const page=await desktop.firstWindow();
  await page.setViewportSize({width:1440,height:1000});
  await page.clock.install({time:new Date()});
@@ -31,9 +31,11 @@ try{
  await pdfFrame.locator('#editorInkButton').click();
  await page.waitForFunction(()=>document.querySelector('#pdf-viewer').contentWindow.PDFViewerApplication.pdfViewer.annotationEditorMode===15);
  const bounds=await pdfFrame.locator('.page').first().boundingBox();
- await page.mouse.move(bounds.x+130,bounds.y+110);await page.mouse.down();
- for(let i=1;i<=20;i++)await page.mouse.move(bounds.x+130+i*5,bounds.y+110+Math.sin(i/3)*25);
- await page.mouse.up();
+ const cdp=await page.context().newCDPSession(page);
+ await cdp.send('Input.dispatchMouseEvent',{type:'mousePressed',x:bounds.x+130,y:bounds.y+110,button:'left',buttons:1,pointerType:'pen',force:.5});
+ for(let i=1;i<=20;i++)await cdp.send('Input.dispatchMouseEvent',{type:'mouseMoved',x:bounds.x+130+i*5,y:bounds.y+110+Math.sin(i/3)*25,button:'left',buttons:1,pointerType:'pen',force:.5});
+ await cdp.send('Input.dispatchMouseEvent',{type:'mouseReleased',x:bounds.x+230,y:bounds.y+120,button:'left',buttons:0,pointerType:'pen'});
+ await cdp.detach();
  await page.clock.fastForward(300000);
  await page.waitForFunction(()=>document.querySelector('#save-status').textContent.startsWith('Saved locally at'));
  await page.getByRole('button',{name:'Save',exact:true}).click();
@@ -62,5 +64,27 @@ try{
  await page.getByText('Annotated PDF exported.',{exact:true}).waitFor();
  assert.ok((await PDFDocument.load(await fs.readFile(exported))).getPage(0).node.Annots().size()>0);
  if(qaDir)await fs.copyFile(exported,path.join(qaDir,'annotated.pdf'));
- console.log('Electron smoke passed: sandbox isolation, inversion, real ink drawing, five-minute autosave, local PDF save, recovery copy, reopen with embedded ink, metadata, navigation, and PDF export.');
+ // Exercise the native import dialog, subject creation, assignment, and search.
+ await page.getByRole('button',{name:'← Library',exact:true}).click();
+ const importedFile=path.join(dir,'Biology notes.pdf');await fs.copyFile(new URL('../assets/welcome.pdf',import.meta.url),importedFile);
+ await desktop.evaluate(({dialog},file)=>{dialog.showOpenDialog=async()=>({canceled:false,filePaths:[file]});},importedFile);
+ await page.getByRole('button',{name:'Add PDF',exact:false}).first().click();
+ await page.getByRole('button',{name:'Open Biology notes',exact:true}).waitFor();
+ await page.getByRole('button',{name:'Add subject',exact:true}).click();
+ await page.getByLabel('Subject name',{exact:true}).fill('Biology');
+ await page.getByRole('button',{name:'Create subject',exact:true}).click();
+ const assigned=JSON.parse(await fs.readFile(path.join(dir,'library','library.json'),'utf8')).subjects.find(s=>s.name==='Biology');
+ await page.getByLabel('Subject for Biology notes',{exact:true}).selectOption(assigned.id);
+ await page.getByRole('button',{name:'Biology 1',exact:true}).click();
+ assert.equal(await page.locator('.document-card').count(),1);
+ await page.getByRole('searchbox',{name:'Search PDFs',exact:true}).fill('missing-document');
+ await page.locator('#empty-state').waitFor({state:'visible'});
+ await page.getByRole('searchbox',{name:'Search PDFs',exact:true}).fill('Biology');
+ await page.getByRole('button',{name:'Open Biology notes',exact:true}).click();
+ await page.waitForFunction(()=>document.querySelector('#pdf-viewer').contentWindow.PDFViewerApplication?.pdfDocument&&document.querySelector('#save-status').textContent.startsWith('Saved locally'));
+ // Simulate a failed library save: exporting the currently open PDF must still work.
+ await desktop.evaluate(({ipcMain})=>{ipcMain.removeHandler('library:save');ipcMain.handle('library:save',()=>{throw Error('Simulated full library disk');});});
+ await page.getByRole('button',{name:'Export PDF ↗',exact:true}).click();
+ await page.getByText('PDF exported. Local autosave still needs attention.',{exact:true}).waitFor();
+ console.log('Electron smoke passed: sandbox isolation, inversion, pen ink drawing, five-minute autosave, local PDF save, recovery copy, reopen with embedded ink, metadata, import, subjects, search, and PDF export even after a library save failure.');
 }finally{await desktop?.close();await fs.rm(dir,{recursive:true,force:true});}
