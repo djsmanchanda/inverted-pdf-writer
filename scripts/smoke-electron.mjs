@@ -73,6 +73,7 @@ try{
  await page.getByRole('button',{name:'Add subject',exact:true}).click();
  await page.getByLabel('Subject name',{exact:true}).fill('Biology');
  await page.getByRole('button',{name:'Create subject',exact:true}).click();
+ await page.getByText('Subject added.',{exact:true}).waitFor();
  const assigned=JSON.parse(await fs.readFile(path.join(dir,'library','library.json'),'utf8')).subjects.find(s=>s.name==='Biology');
  await page.getByLabel('Subject for Biology notes',{exact:true}).selectOption(assigned.id);
  await page.getByRole('button',{name:'Biology 1',exact:true}).click();
