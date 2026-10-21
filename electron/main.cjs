@@ -5,6 +5,8 @@ const { pathToFileURL } = require('node:url');
 const { Library } = require('./library.cjs');
 protocol.registerSchemesAsPrivileged([{scheme:'study',privileges:{standard:true,secure:true,supportFetchAPI:true,stream:true,codeCache:true}}]);
 if (process.env.INVERTED_PDF_DATA_DIR) app.setPath('userData', path.resolve(process.env.INVERTED_PDF_DATA_DIR));
+if(!app.requestSingleInstanceLock()){app.quit();process.exit(0);}
+app.on('second-instance',()=>{if(window){if(window.isMinimized())window.restore();window.focus();}});
 let window, library, closing = false, closePending = false;
 const root = path.resolve(__dirname, '..');
 app.whenReady().then(async () => {
@@ -40,17 +42,18 @@ app.whenReady().then(async () => {
     }
     return library.snapshot();
   });
-  handle('library:export',async id=>{
+  handle('library:export',async (id, bytes)=>{
     const doc=library.document(id);
     const result=await dialog.showSaveDialog(window,{title:'Export annotated PDF',defaultPath:doc.name.replace(/[<>:"/\\|?*\x00-\x1f]/g,'_')+'.pdf',filters:[{name:'PDF document',extensions:['pdf']}]});
     if(result.canceled) return false;
     if(path.resolve(result.filePath).startsWith(path.resolve(library.root)+path.sep)) throw new Error('Export outside the app library to keep recovery files safe.');
     const {atomicWrite}=require('./library.cjs');
-    await atomicWrite(result.filePath,await library.read(id)); return true;
+    const data=bytes ? require('./library.cjs').pdfBytes(bytes) : await library.read(id);
+    await atomicWrite(result.filePath,data); return true;
   });
   handle('library:reveal',()=>shell.openPath(library.root));
   Menu.setApplicationMenu(null);
-  window=new BrowserWindow({width:1440,height:960,minWidth:900,minHeight:650,title:'Inverted PDF Writer',backgroundColor:'#161918',autoHideMenuBar:true,webPreferences:{preload:path.join(__dirname,'preload.cjs'),contextIsolation:true,nodeIntegration:false,sandbox:true,spellcheck:false}});
+  window=new BrowserWindow({width:1440,height:960,minWidth:900,minHeight:650,title:'Inverted PDF Writer',backgroundColor:'#161918',autoHideMenuBar:true,icon:path.join(root,'assets','icon.png'),webPreferences:{preload:path.join(__dirname,'preload.cjs'),contextIsolation:true,nodeIntegration:false,sandbox:true,spellcheck:false}});
   window.webContents.setWindowOpenHandler(()=>({action:'deny'}));
   window.webContents.on('will-navigate',event=>event.preventDefault());
   window.webContents.on('will-attach-webview',event=>event.preventDefault());

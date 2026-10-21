@@ -1,0 +1,6 @@
+* text=auto eol=lf
+# Preserve upstream resource bytes so their recorded SHA-256 digests match on Windows.
+vendor/pdfjs/** -text
+*.pdf binary
+*.ico binary
+*.png binary

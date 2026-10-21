@@ -94,7 +94,7 @@ async function openDocument(id){
   frame.contentDocument.addEventListener('pointerup',()=>{if(pointerDown){pointerDown=false;if(viewer.pdfViewer.annotationEditorMode>0)markChanged();}},true);
   frame.contentDocument.addEventListener('pointercancel',()=>pointerDown=false,true);
   frame.contentDocument.addEventListener('keydown',event=>{if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==='s'){event.preventDefault();event.stopImmediatePropagation();saveActive(true).catch(report);}},true);
-  viewer.downloadOrSave=async()=>{await saveActive();await storage.exportDocument(active);};
+  viewer.downloadOrSave=()=>exportActive();
   viewer.eventBus.on('pagechanging',()=>{if(active===id)saveStatus(revision===savedRevision?'Saved locally · Ctrl+S to save anytime':'Unsaved notes · next autosave within 5 minutes');});
   applyReadingSettings();
   const page=Math.min(doc.page || 1,pdf.numPages);viewer.page=page;
@@ -136,7 +136,17 @@ $('#cancel-subject').onclick=()=>$('#subject-dialog').close();
 $('#subject-form').onsubmit=async event=>{event.preventDefault();try{state=await storage.createSubject($('#subject-name').value);$('#subject-dialog').close();renderLibrary();toast('Subject added.');}catch(error){$('#subject-error').textContent=error.message;}};
 $('#storage-button').onclick=()=>storage.revealLibrary().catch(report);
 $('#back-button').onclick=()=>closeReader().catch(report);$('#save-button').onclick=()=>saveActive(true).catch(report);
-$('#export-button').onclick=async()=>{const button=$('#export-button');button.disabled=true;try{await saveActive();if(await storage.exportDocument(active))toast('Annotated PDF exported.');}catch(error){report(error);}finally{button.disabled=false;}};
+async function exportActive(){
+ const button=$('#export-button');button.disabled=true;
+ try{
+  let saveFailed=false;
+  try{await saveActive();}catch(error){saveFailed=true;console.error('Local save failed; exporting the open notes instead.',error);}
+  viewer.pdfViewer._layerProperties.annotationEditorUIManager?.endCurrentEditing();
+  const bytes=await viewer.pdfDocument.saveDocument();
+  if(await storage.exportDocument(active,bytes))toast(saveFailed?'PDF exported. Local autosave still needs attention.':'Annotated PDF exported.');
+ }catch(error){report(error);}finally{button.disabled=false;}
+}
+$('#export-button').onclick=exportActive;
 $('#reader-subject').onchange=async()=>{try{state=await storage.updateDocument(active,{subjectId:$('#reader-subject').value || null});renderSidebar();}catch(error){report(error);}};
 $('#invert-button').onclick=()=>{inverted=!inverted;localStorage.setItem('inverted-pdf:inverted',String(inverted));applyReadingSettings();};
 $('#touch-button').onclick=()=>{fingerDrawing=!fingerDrawing;localStorage.setItem('inverted-pdf:fingerDrawing',String(fingerDrawing));applyReadingSettings();};

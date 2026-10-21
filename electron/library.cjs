@@ -22,12 +22,16 @@ async function atomicWrite(file, bytes) {
 class Library {
   constructor(root) { this.root = root; this.queue = Promise.resolve(); }
   run(action) {
-    const next = this.queue.then(action);
+    const next = this.queue.then(async () => {
+      const before = this.state && structuredClone(this.state);
+      try { return await action(); } catch(error) { if(before) this.state = before; throw error; }
+    });
     this.queue = next.catch(() => {});
     return next;
   }
   async init() {
     await fs.mkdir(this.root, { recursive: true });
+    let recovered = false;
     try { this.state = JSON.parse(await fs.readFile(path.join(this.root, 'library.json'), 'utf8')); }
     catch (error) {
       if (error.code === 'ENOENT') this.state = { version: 1, subjects: [
@@ -36,12 +40,13 @@ class Library {
         { id: 'chemistry', name: 'Chemistry', color: '#b6abcf' },
       ], documents: [] };
       else {
-        try { this.state = JSON.parse(await fs.readFile(path.join(this.root, 'library.previous.json'), 'utf8')); }
+        try { this.state = JSON.parse(await fs.readFile(path.join(this.root, 'library.previous.json'), 'utf8')); recovered = true; }
         catch { throw new Error('The library index could not be read. Your PDFs are still in the documents folder. Restore library.previous.json from your backup.'); }
       }
     }
     if (this.state.version !== 1 || !Array.isArray(this.state.documents) || !Array.isArray(this.state.subjects)) throw new Error('Unsupported library format.');
-    await this.persist();
+    if(recovered) await atomicWrite(path.join(this.root,'library.json'), JSON.stringify(this.state,null,2));
+    else await this.persist();
     return this.snapshot();
   }
   snapshot() { return structuredClone(this.state); }

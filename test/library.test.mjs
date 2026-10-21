@@ -48,3 +48,17 @@ test('autosave uses exactly five minutes, coalesces overlapping saves, and repor
  saver.save=()=>{throw Error('Disk full');};await saver.tick();assert.deepEqual(errors,['Disk full']);assert.equal(saver.pending,null);
  let held=true;saver.canSave=()=>!held;saver.save=async()=>calls++;await saver.tick();assert.equal(calls,1);held=false;await saver.tick();assert.equal(calls,2);
 });
+test('failed index writes roll back in-memory changes and keep the queue usable',async t=>{
+ const store=await library(t),persist=store.persist.bind(store);
+ store.persist=async()=>{throw Error('Disk full');};
+ await assert.rejects(store.createSubject('Should not remain'),/Disk full/);
+ assert.equal(store.snapshot().subjects.some(s=>s.name==='Should not remain'),false);
+ store.persist=persist;await store.createSubject('Recovered');assert.equal(store.snapshot().subjects.at(-1).name,'Recovered');
+});
+test('recovering a damaged index preserves a valid previous index',async t=>{
+ const store=await library(t),doc=await store.importPdf('Recovery.pdf',fixture);
+ await store.update(doc.id,{page:2});await fs.writeFile(path.join(store.root,'library.json'),'damaged');
+ const recovered=new Library(store.root);await recovered.init();
+ const previous=JSON.parse(await fs.readFile(path.join(store.root,'library.previous.json'),'utf8'));
+ assert.equal(previous.documents[0].id,doc.id);
+});

@@ -1,4 +1,1 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <rect width="64" height="64" rx="14" fill="#d97706"/>
-  <text x="32" y="32" dy="0.35em" text-anchor="middle" font-family="ui-sans-serif, system-ui, -apple-system, sans-serif" font-size="26" font-weight="600" fill="#ffffff">IP</text>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256"><rect width="256" height="256" rx="55" fill="#182019"/><rect x="58" y="43" width="123" height="157" rx="13" fill="#879c76"/><rect x="77" y="58" width="123" height="157" rx="13" fill="#e8ad83"/><path d="M138 58h49q13 0 13 13v131q0 13-13 13h-49Z" fill="#293324"/><path d="M98 97h79M98 121h79M98 145h58" fill="none" stroke="#293324" stroke-width="8" stroke-linecap="round"/><path d="M142 97h35M142 121h35M142 145h14" fill="none" stroke="#e8ad83" stroke-width="8" stroke-linecap="round"/></svg>

@@ -4,12 +4,17 @@ import os from 'node:os';
 import path from 'node:path';
 import assert from 'node:assert/strict';
 import { PDFDocument, PDFName } from 'pdf-lib';
+const qaDir=process.env.INVERTED_PDF_QA_DIR;
+if(qaDir)await fs.mkdir(qaDir,{recursive:true});
 const dir=await fs.mkdtemp(path.join(os.tmpdir(),'inverted-electron-'));
 const env={...process.env,INVERTED_PDF_DATA_DIR:dir};delete env.ELECTRON_RUN_AS_NODE;
 let desktop;
 try{
  desktop=await electron.launch({args:['.',...(process.platform==='linux'?['--no-sandbox','--ozone-platform=headless']:[])],env,timeout:60000});
  const page=await desktop.firstWindow();
+ await page.setViewportSize({width:1440,height:1000});
+ await page.clock.install({time:new Date()});
+ await page.reload();
  page.on('pageerror',error=>console.error('Renderer:',error.message));
  await page.getByRole('button',{name:'Open Welcome to your study desk',exact:true}).click();
  await page.waitForFunction(()=>{const app=document.querySelector('#pdf-viewer').contentWindow.PDFViewerApplication;return app?.pdfDocument&&document.querySelector('#save-status').textContent.startsWith('Saved locally');},{},{timeout:30000});
@@ -22,16 +27,20 @@ try{
  await page.getByRole('button',{name:'◐ Inverted',exact:true}).click();
  assert.equal(await pdfFrame.locator('html').evaluate(e=>e.classList.contains('inverted-page')),false);
  await page.getByRole('button',{name:'◐ Normal',exact:true}).click();
+ if(qaDir)await page.screenshot({path:path.join(qaDir,'reader.png')});
  await pdfFrame.locator('#editorInkButton').click();
  await page.waitForFunction(()=>document.querySelector('#pdf-viewer').contentWindow.PDFViewerApplication.pdfViewer.annotationEditorMode===15);
  const bounds=await pdfFrame.locator('.page').first().boundingBox();
  await page.mouse.move(bounds.x+130,bounds.y+110);await page.mouse.down();
  for(let i=1;i<=20;i++)await page.mouse.move(bounds.x+130+i*5,bounds.y+110+Math.sin(i/3)*25);
  await page.mouse.up();
+ await page.clock.fastForward(300000);
+ await page.waitForFunction(()=>document.querySelector('#save-status').textContent.startsWith('Saved locally at'));
  await page.getByRole('button',{name:'Save',exact:true}).click();
  await page.getByText('PDF and notes saved on this device.',{exact:true}).waitFor();
  await page.getByRole('button',{name:'← Library',exact:true}).click();
  await page.getByRole('button',{name:'Open Welcome to your study desk',exact:true}).waitFor();
+ if(qaDir){await page.waitForFunction(()=>document.querySelector('.document-cover img'));await page.screenshot({path:path.join(qaDir,'library.png')});}
  const index=JSON.parse(await fs.readFile(path.join(dir,'library','library.json'),'utf8'));
  assert.equal(index.documents[0].pageCount,3);
  assert.ok(index.documents[0].lastOpenedAt);
@@ -52,5 +61,6 @@ try{
  await page.getByRole('button',{name:'Export PDF ↗',exact:true}).click();
  await page.getByText('Annotated PDF exported.',{exact:true}).waitFor();
  assert.ok((await PDFDocument.load(await fs.readFile(exported))).getPage(0).node.Annots().size()>0);
- console.log('Electron smoke passed: sandbox isolation, inversion, real ink drawing, local PDF save, recovery copy, reopen with embedded ink, metadata, navigation, and PDF export.');
+ if(qaDir)await fs.copyFile(exported,path.join(qaDir,'annotated.pdf'));
+ console.log('Electron smoke passed: sandbox isolation, inversion, real ink drawing, five-minute autosave, local PDF save, recovery copy, reopen with embedded ink, metadata, navigation, and PDF export.');
 }finally{await desktop?.close();await fs.rm(dir,{recursive:true,force:true});}
