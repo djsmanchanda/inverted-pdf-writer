@@ -1,0 +1,63 @@
+{
+  "name": "inverted-pdf-writer",
+  "version": "0.1.0",
+  "description": "A local-first PDF study desk with inverted reading and handwritten notes",
+  "author": "Inverted PDF Writer contributors",
+  "license": "Apache-2.0",
+  "private": true,
+  "type": "module",
+  "main": "electron/main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "preview": "node scripts/serve.mjs",
+    "test": "node --test test/*.test.mjs",
+    "test:electron": "node scripts/smoke-electron.mjs",
+    "dist:win": "electron-builder --win nsis --x64",
+    "dist:linux": "electron-builder --linux dir --x64",
+    "verify:vendor": "node scripts/verify-vendor.mjs",
+    "postinstall": "node node_modules/electron/install.js"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.64.1",
+    "electron": "45.0.0",
+    "electron-builder": "26.15.3",
+    "pdf-lib": "1.17.1"
+  },
+  "build": {
+    "appId": "org.invertedpdf.writer",
+    "productName": "Inverted PDF Writer",
+    "artifactName": "Inverted-PDF-Writer-${version}-${arch}-Setup.${ext}",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "app/**/*",
+      "electron/**/*",
+      "vendor/pdfjs/**/*",
+      "assets/icon.*",
+      "LICENSE",
+      "THIRD_PARTY_NOTICES.md",
+      "package.json",
+      "assets/welcome.pdf"
+    ],
+    "asar": true,
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "signAndEditExecutable": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "deleteAppDataOnUninstall": false
+    },
+    "linux": {
+      "target": "dir",
+      "category": "Education"
+    }
+  }
+}

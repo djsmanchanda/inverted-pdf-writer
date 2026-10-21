@@ -1,0 +1,9 @@
+/* Desktop fork: invert only document content, leaving viewer controls readable. */
+:root{--toolbar-bg-color:#252d21;--body-bg-color:#20251e;--main-color:#dce5d2;--toolbar-border-color:#3d4934;--toolbar-height:42px}
+:root.inverted-page #viewer .page{filter:invert(1) hue-rotate(180deg);background:white}
+#viewerContainer{background:#20251e}
+#openFile,#openFileButton,#secondaryOpenFile,#secondaryOpenFileButton,#download,#downloadButton,#secondaryDownload,#secondaryDownloadButton,#editorSignature,#editorStamp,#editorComment,#print,#printButton,#secondaryPrint,#secondaryPrintButton,#viewsManagerToggleButton,#pageNumberLabel{display:none!important}
+.toolbarButton{min-width:32px;min-height:34px}
+@media(pointer:coarse){.toolbarButton{min-width:38px;min-height:38px}}
+@media print{:root.inverted-page #viewer .page{filter:none}}
+:root:not(.finger-drawing) #viewerContainer{touch-action:none}
